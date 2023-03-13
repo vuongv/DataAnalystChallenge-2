@@ -1,0 +1,222 @@
+Function DeleteFirstRow() As String
+    ActiveSheet.Rows(1).Delete
+End Function
+
+Function AddHeaders() As String
+    Rows(1).Insert Shift:=xlDown
+    Range("A1").value = "<ticker>"
+    Range("B1").value = "<date>"
+    Range("C1").value = "<open>"
+    Range("D1").value = "<high>"
+    Range("E1").value = "<low>"
+    Range("F1").value = "<close>"
+    Range("G1").value = "<vol>"
+    Range("I1").value = "Ticker"
+    Range("J1").value = "Yearly Change"
+    Range("K1").value = "Percentage Change"
+    Range("L1").value = "Total Volume"
+    Range("O1").value = "Ticker"
+    Range("P1").value = "Value"
+    Range("N2").value = "Greatest % Increase"
+    Range("N3").value = "Greatest % Decrease"
+    Range("N4").value = "Greatest Total Volume"
+End Function
+
+Function FindUniqueTickers() As String
+    Dim tickerDict As Object
+    Dim tickerArr As Variant
+    Dim ticker As Variant
+    Dim lastRow As Long
+    Dim i As Long
+    
+    Set tickerDict = CreateObject("Scripting.Dictionary")
+    lastRow = Cells(Rows.count, 1).End(xlUp).Row
+    
+    For i = 1 To lastRow
+        ticker = Cells(i, 1).value
+        If Not tickerDict.exists(ticker) Then
+            tickerDict.Add ticker, ticker
+        End If
+    Next i
+    
+    'Place the unique tickers in Column I
+    tickerArr = tickerDict.keys
+    Range("I1").Resize(tickerDict.count, 1).value = Application.Transpose(tickerArr)
+End Function
+
+Function ConvertDateColumn() As String
+    Dim lastRow As Long
+    lastRow = Cells(Rows.count, "B").End(xlUp).Row
+    
+    Dim i As Long
+    For i = 1 To lastRow
+        Dim dateString As String
+        dateString = Cells(i, "B").value
+        
+        Dim dateV As Date
+        dateV = DateValue(Right(dateString, 2) & "/" & Mid(dateString, 5, 2) & "/" & Left(dateString, 4))
+        
+        Dim formattedDate As String
+        formattedDate = Format(dateV, "yyyy-mm-dd")
+        
+        Cells(i, "B").value = formattedDate
+    Next i
+End Function
+
+Sub findAll()
+    Dim lastRow As Long
+    Dim lastRowData As Long
+    Dim tickerData As Long
+    Dim tickerColumn As Long
+    Dim dateColumn As Long
+    Dim openColumn As Long
+    Dim closeColumn As Long
+    Dim yearStartRow As Long
+    Dim yearEndRow As Long
+    Dim i As Long
+    Dim y As Long
+    Dim tickerCurrent As String
+    Dim tickerNext As String
+    Dim yearTicker As Long
+    Dim monthTicker As Long
+    Dim dateTicker As Long
+    Dim openValue As Double
+    Dim closeValue As Double
+    Dim yearlyChange As Double
+    Dim value As Double
+    Dim last_known As Double
+    Dim runScript As String
+    
+    tickerData = 1
+    tickerColumn = 9
+    dateColumn = 2
+    openColumn = 3
+    closeColumn = 6
+    last_known = 0
+    
+    runScript = DeleteFirstRow()
+    runScript = FindUniqueTickers()
+    runScript = ConvertDateColumn()
+    
+    lastRow = ActiveSheet.Cells(Rows.count, tickerData).End(xlUp).Row 'last row of the column 1
+    lastRowData = ActiveSheet.Cells(Rows.count, tickerColumn).End(xlUp).Row ' last row of column 10
+    
+    
+    For i = 1 To lastRowData 'loop through the Column 10
+        tickerCurrent = Cells(i, 9).value
+        last_known = find_yearly_change_with_percentage_and_total_volume(last_known + 1, tickerCurrent)
+    Next i
+    
+    runScript = AddHeaders()
+    runScript = find_Greatest_Percentage()
+End Sub
+
+Function find_count_ticker(ticker As String) As Double
+    Dim count As Integer
+    Dim rangeToSearch As Range
+    Dim lastRow As Long
+    lastRow = ActiveSheet.Cells(Rows.count, "A").End(xlUp).Row
+    
+    Set rangeToSearch = Range("A1:A" & lastRow)
+    count = Application.WorksheetFunction.CountIf(rangeToSearch, ticker)
+    
+    find_count_ticker = count
+    
+End Function
+
+Function find_yearly_change_with_percentage_and_total_volume(last_known As Double, ticker As String) As Double
+    Dim pointer As Double
+    pointer = find_count_ticker(ticker)
+
+    
+    Dim volume As Double
+    volume = 0
+    Dim newRange As Double
+    newRange = last_known + pointer
+    
+    For i = last_known To newRange
+        volume = volume + Cells(i, 7).value
+    Next i
+   
+    
+    Dim first_open As Double
+    first_open = Cells(last_known, 3).value
+    
+    
+    Dim last_close As Double
+    last_close = Cells(pointer, 6).value
+    
+    
+    last_known = last_known + pointer - 1
+    
+    
+    Dim tickerColumnDistinct As Long
+    tickerColumnDistinct = 9
+    
+    Dim yearlyChange As Double
+    yearlyChange = last_close - first_open
+    
+    Dim percentage As Double
+    percentage = Round((yearlyChange / first_open) * 100, 2)
+    
+    Dim lastRowI As Long
+    lastRowI = ActiveSheet.Cells(Rows.count, "I").End(xlUp).Row
+    
+    For i = 1 To lastRowI
+        If Cells(i, 9).value = ticker Then
+            
+            If yearlyChange > 0 Then
+                Cells(i, 10).Interior.Color = RGB(0, 255, 0)
+            Else
+                Cells(i, 10).Interior.Color = RGB(255, 0, 0)
+            End If
+            Cells(i, 10).value = yearlyChange
+            Cells(i, 11).value = percentage
+            Cells(i, 12).value = volume
+        End If
+    Next i
+    find_yearly_change_with_percentage_and_total_volume = last_known
+    
+End Function
+
+Function find_Greatest_Percentage()
+    Dim yearlyColumn As Integer
+    Dim lastRow As Long
+    lastRow = ActiveSheet.Cells(Rows.count, "K").End(xlUp).Row
+    Dim maxvalue As Double
+    Dim maxTicker As String
+    
+    For i = 2 To lastRow
+        If Cells(i, 11).value > maxvalue Then
+            maxvalue = Cells(i, 11).value
+            maxTicker = Cells(i, 9).value
+        End If
+    Next i
+    Range("P2").value = maxvalue
+    Range("O2").value = maxTicker
+    
+    Dim mimvalue As Double
+    Dim minTicker As String
+    For i = 2 To lastRow
+        If Cells(i, 11).value < minvalue Then
+            minvalue = Cells(i, 11).value
+            minTicker = Cells(i, 9).value
+        End If
+    Next i
+    Range("P3").value = minvalue
+    Range("O3").value = minTicker
+    
+    Dim maxVol As Double
+    Dim volTicker As String
+    For i = 2 To lastRow
+        If Cells(i, 12).value > maxVol Then
+            maxVol = Cells(i, 12).value
+            volTicker = Cells(i, 9).value
+        End If
+    Next i
+    Range("P4").value = maxVol
+    Range("O4").value = volTicker
+End Function
+
+
+
